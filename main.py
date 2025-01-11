@@ -1,3 +1,4 @@
+# standard libraries
 import numpy as np
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
@@ -6,6 +7,9 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 import os
 from datetime import datetime
+
+# our modules
+from adam import AdamOptimizer
 
 # Load MNIST dataset
 print("Loading MNIST dataset...")
@@ -66,43 +70,11 @@ def initialize_network():
     biases = np.zeros(10)
     return kernel, weights, biases
 
-# Adam optimizer
-class AdamOptimizer:
-    def __init__(self, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8):
-        self.lr = learning_rate
-        self.beta1 = beta1
-        self.beta2 = beta2
-        self.epsilon = epsilon
-        self.m_weights = 0
-        self.v_weights = 0
-        self.m_biases = 0
-        self.v_biases = 0
-        self.t = 0
-
-    def update(self, weights, biases, grad_weights, grad_biases):
-        self.t += 1
-        # Update biased first moments
-        self.m_weights = self.beta1 * self.m_weights + (1 - self.beta1) * grad_weights
-        self.m_biases = self.beta1 * self.m_biases + (1 - self.beta1) * grad_biases
-
-        # Update biased second moments
-        self.v_weights = self.beta2 * self.v_weights + (1 - self.beta2) * (grad_weights ** 2)
-        self.v_biases = self.beta2 * self.v_biases + (1 - self.beta2) * (grad_biases ** 2)
-
-        # Compute bias-corrected moments
-        m_weights_corr = self.m_weights / (1 - self.beta1 ** self.t)
-        m_biases_corr = self.m_biases / (1 - self.beta1 ** self.t)
-        v_weights_corr = self.v_weights / (1 - self.beta2 ** self.t)
-        v_biases_corr = self.v_biases / (1 - self.beta2 ** self.t)
-
-        # Update weights and biases
-        weights -= self.lr * m_weights_corr / (np.sqrt(v_weights_corr) + self.epsilon)
-        biases -= self.lr * m_biases_corr / (np.sqrt(v_biases_corr) + self.epsilon)
-
-        return weights, biases
-
 # Save visualizations
 def save_visualizations(kernel, weights, best_accuracy, output_dir):
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     combined_filename = os.path.join(output_dir, f"visualizations_{timestamp}.png")
     plt.figure(figsize=(10, 5))
@@ -132,8 +104,11 @@ for i in range(len(X_test)):
     predictions, _ = forward_pass(X_test[i], weights, biases, kernel)
     y_pred_initial.append(np.argmax(predictions) == y_test[i])
 initial_accuracy = sum(y_pred_initial) / len(y_pred_initial)
-# save the initial kernel and weights
-save_visualizations(kernel, weights, initial_accuracy, "visualizations")
+
+# Create output directory and save initial visualizations
+output_dir = "visualizations"
+os.makedirs(output_dir, exist_ok=True)
+save_visualizations(kernel, weights, initial_accuracy, output_dir)
 
 adam_optimizer = AdamOptimizer(learning_rate=0.001)
 
@@ -167,8 +142,6 @@ for epoch in range(num_epochs):
     print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss_sums[-1]:.4f}, Accuracy: {accuracies[-1]:.4f}")
 
 # Save final visualizations
-output_dir = "visualizations"
-os.makedirs(output_dir, exist_ok=True)
 save_visualizations(kernel, weights, accuracies[-1], output_dir)
 
 # Evaluate on test data
