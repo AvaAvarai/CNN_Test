@@ -42,8 +42,8 @@ def max_pooling(feature_map, size=2, stride=2):
 def fully_connected(flattened_input, weights, bias):
     return np.dot(flattened_input, weights) + bias
 
-def relu(x):
-    return np.maximum(0, x)
+def leaky_relu(x, alpha=0.01):
+    return np.where(x > 0, x, alpha * x)
 
 def softmax(x):
     exp_x = np.exp(x - np.max(x))
@@ -53,7 +53,7 @@ def cross_entropy_loss(predictions, label):
     return -np.log(predictions[label])
 
 def forward_pass(image, weights, biases, kernel):
-    conv_output = relu(convolve(image, kernel))
+    conv_output = leaky_relu(convolve(image, kernel))
     pooled_output = max_pooling(conv_output)
     flattened = pooled_output.flatten()
     fc_output = fully_connected(flattened, weights, biases)
