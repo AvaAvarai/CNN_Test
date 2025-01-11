@@ -58,16 +58,20 @@ kernel = np.random.randn(3, 3) * 0.1
 weights = np.random.randn(13 * 13, 10) * 0.1
 biases = np.zeros(10)
 
-# Training
-learning_rate = 0.01
+# Training loop with adaptive learning rate
+initial_learning_rate = 0.01
+decay_rate = 0.1
+
 num_epochs = 10
 batch_size = 64
+
 loss_sums = []
 accuracies = []
 
 for epoch in range(num_epochs):
     loss_sum = 0
     correct = 0
+    learning_rate = initial_learning_rate / (1 + decay_rate * epoch)
 
     for batch_start in range(0, len(X_train), batch_size):
         batch_images = X_train[batch_start:batch_start + batch_size]
@@ -78,6 +82,7 @@ for epoch in range(num_epochs):
             loss_sum += cross_entropy_loss(predictions, label)
             correct += (np.argmax(predictions) == label)
 
+            # Gradients
             grad_output = predictions
             grad_output[label] -= 1
             weights -= learning_rate * np.outer(flattened, grad_output)
@@ -85,7 +90,7 @@ for epoch in range(num_epochs):
 
     loss_sums.append(loss_sum / len(X_train))
     accuracies.append(correct / len(X_train))
-    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss_sums[-1]:.4f}, Accuracy: {accuracies[-1]:.4f}")
+    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss_sums[-1]:.4f}, Accuracy: {accuracies[-1]:.4f}, Learning Rate: {learning_rate:.6f}")
 
 # Evaluate
 y_pred = []
