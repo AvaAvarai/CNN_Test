@@ -54,17 +54,46 @@ def forward_pass(image, weights, biases, kernel):
     return predictions, flattened
 
 # Initialize parameters
-kernel = np.random.randn(3, 3) * 0.1
-weights = np.random.randn(13 * 13, 10) * 0.1
-biases = np.zeros(10)
+def initialize_network():
+    kernel = np.random.randn(3, 3) * 0.1
+    weights = np.random.randn(13 * 13, 10) * 0.1
+    biases = np.zeros(10)
+    return kernel, weights, biases
 
-# Training loop with adaptive learning rate
+# Evaluate a network
+def evaluate_network(X_batch, y_batch, kernel, weights, biases):
+    correct = 0
+    for image, label in zip(X_batch, y_batch):
+        predictions, _ = forward_pass(image, weights, biases, kernel)
+        if np.argmax(predictions) == label:
+            correct += 1
+    return correct / len(X_batch)
+
+# Select the best network
+num_candidates = 50
+batch_size = 64
+X_batch, y_batch = X_train[:batch_size], y_train[:batch_size]
+
+best_kernel, best_weights, best_biases = None, None, None
+best_accuracy = 0
+
+for i in range(num_candidates):
+    kernel, weights, biases = initialize_network()
+    accuracy = evaluate_network(X_batch, y_batch, kernel, weights, biases)
+    print(f"Candidate {i + 1}: Initial Accuracy = {accuracy:.4f}")
+    if accuracy > best_accuracy:
+        best_accuracy = accuracy
+        best_kernel, best_weights, best_biases = kernel, weights, biases
+
+print(f"Best Initial Accuracy = {best_accuracy:.4f}")
+
+# Use the best network for training
+kernel, weights, biases = best_kernel, best_weights, best_biases
+
+# Training loop
 initial_learning_rate = 0.01
 decay_rate = 0.1
-
 num_epochs = 10
-batch_size = 64
-
 loss_sums = []
 accuracies = []
 
@@ -92,7 +121,7 @@ for epoch in range(num_epochs):
     accuracies.append(correct / len(X_train))
     print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss_sums[-1]:.4f}, Accuracy: {accuracies[-1]:.4f}, Learning Rate: {learning_rate:.6f}")
 
-# Evaluate
+# Evaluate on test data
 y_pred = []
 for i in range(len(X_test)):
     predictions, _ = forward_pass(X_test[i], weights, biases, kernel)
