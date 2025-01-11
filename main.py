@@ -3,6 +3,9 @@ from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, classification_report
 from matplotlib import pyplot as plt
+import seaborn as sns
+import os
+from datetime import datetime
 
 # Load MNIST dataset
 print("Loading MNIST dataset...")
@@ -55,52 +58,91 @@ def forward_pass(image, weights, biases, kernel):
 
 # Initialize parameters
 def initialize_network():
-    kernel = np.random.randn(3, 3) * 0.1
-    weights = np.random.randn(13 * 13, 10) * 0.1
+    # He initialization for kernel (input shape is 1 channel)
+    kernel = np.random.randn(3, 3) * np.sqrt(2.0 / (28 * 28))
+    # He initialization for weights (input shape is 13*13 from pooled feature map)
+    weights = np.random.randn(13 * 13, 10) * np.sqrt(2.0 / (13 * 13))
+    # biases for the fully connected layer
     biases = np.zeros(10)
     return kernel, weights, biases
 
-# Evaluate a network
-def evaluate_network(X_batch, y_batch, kernel, weights, biases):
-    correct = 0
-    for image, label in zip(X_batch, y_batch):
-        predictions, _ = forward_pass(image, weights, biases, kernel)
-        if np.argmax(predictions) == label:
-            correct += 1
-    return correct / len(X_batch)
+# Adam optimizer
+class AdamOptimizer:
+    def __init__(self, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        self.lr = learning_rate
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.m_weights = 0
+        self.v_weights = 0
+        self.m_biases = 0
+        self.v_biases = 0
+        self.t = 0
 
-# Select the best network
-num_candidates = 50
-batch_size = 64
-X_batch, y_batch = X_train[:batch_size], y_train[:batch_size]
+    def update(self, weights, biases, grad_weights, grad_biases):
+        self.t += 1
+        # Update biased first moments
+        self.m_weights = self.beta1 * self.m_weights + (1 - self.beta1) * grad_weights
+        self.m_biases = self.beta1 * self.m_biases + (1 - self.beta1) * grad_biases
 
-best_kernel, best_weights, best_biases = None, None, None
-best_accuracy = 0
+        # Update biased second moments
+        self.v_weights = self.beta2 * self.v_weights + (1 - self.beta2) * (grad_weights ** 2)
+        self.v_biases = self.beta2 * self.v_biases + (1 - self.beta2) * (grad_biases ** 2)
 
-for i in range(num_candidates):
-    kernel, weights, biases = initialize_network()
-    accuracy = evaluate_network(X_batch, y_batch, kernel, weights, biases)
-    print(f"Candidate {i + 1}: Initial Accuracy = {accuracy:.4f}")
-    if accuracy > best_accuracy:
-        best_accuracy = accuracy
-        best_kernel, best_weights, best_biases = kernel, weights, biases
+        # Compute bias-corrected moments
+        m_weights_corr = self.m_weights / (1 - self.beta1 ** self.t)
+        m_biases_corr = self.m_biases / (1 - self.beta1 ** self.t)
+        v_weights_corr = self.v_weights / (1 - self.beta2 ** self.t)
+        v_biases_corr = self.v_biases / (1 - self.beta2 ** self.t)
 
-print(f"Best Initial Accuracy = {best_accuracy:.4f}")
+        # Update weights and biases
+        weights -= self.lr * m_weights_corr / (np.sqrt(v_weights_corr) + self.epsilon)
+        biases -= self.lr * m_biases_corr / (np.sqrt(v_biases_corr) + self.epsilon)
 
-# Use the best network for training
-kernel, weights, biases = best_kernel, best_weights, best_biases
+        return weights, biases
+
+# Save visualizations
+def save_visualizations(kernel, weights, best_accuracy, output_dir):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    combined_filename = os.path.join(output_dir, f"visualizations_{timestamp}.png")
+    plt.figure(figsize=(10, 5))
+
+    plt.subplot(121)
+    sns.heatmap(kernel, cmap='coolwarm', center=0)
+    plt.title(f'Selected Best Kernel\n(Accuracy: {best_accuracy:.4f})')
+
+    plt.subplot(122)
+    sns.heatmap(weights, cmap='coolwarm', center=0)
+    plt.title(f'Selected Best Weights\n(Accuracy: {best_accuracy:.4f})')
+
+    plt.tight_layout()
+    plt.savefig(combined_filename)
+    plt.close()
+    print(f"Visualizations saved to {combined_filename}")
 
 # Training loop
-initial_learning_rate = 0.01
-decay_rate = 0.1
+batch_size = 64
 num_epochs = 10
+
+kernel, weights, biases = initialize_network()
+
+# Calculate initial accuracy on full test set
+y_pred_initial = []
+for i in range(len(X_test)):
+    predictions, _ = forward_pass(X_test[i], weights, biases, kernel)
+    y_pred_initial.append(np.argmax(predictions) == y_test[i])
+initial_accuracy = sum(y_pred_initial) / len(y_pred_initial)
+# save the initial kernel and weights
+save_visualizations(kernel, weights, initial_accuracy, "visualizations")
+
+adam_optimizer = AdamOptimizer(learning_rate=0.001)
+
 loss_sums = []
 accuracies = []
 
 for epoch in range(num_epochs):
     loss_sum = 0
     correct = 0
-    learning_rate = initial_learning_rate / (1 + decay_rate * epoch)
 
     for batch_start in range(0, len(X_train), batch_size):
         batch_images = X_train[batch_start:batch_start + batch_size]
@@ -114,12 +156,20 @@ for epoch in range(num_epochs):
             # Gradients
             grad_output = predictions
             grad_output[label] -= 1
-            weights -= learning_rate * np.outer(flattened, grad_output)
-            biases -= learning_rate * grad_output
+            grad_weights = np.outer(flattened, grad_output)
+            grad_biases = grad_output
+
+            # Update parameters using Adam optimizer
+            weights, biases = adam_optimizer.update(weights, biases, grad_weights, grad_biases)
 
     loss_sums.append(loss_sum / len(X_train))
     accuracies.append(correct / len(X_train))
-    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss_sums[-1]:.4f}, Accuracy: {accuracies[-1]:.4f}, Learning Rate: {learning_rate:.6f}")
+    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss_sums[-1]:.4f}, Accuracy: {accuracies[-1]:.4f}")
+
+# Save final visualizations
+output_dir = "visualizations"
+os.makedirs(output_dir, exist_ok=True)
+save_visualizations(kernel, weights, accuracies[-1], output_dir)
 
 # Evaluate on test data
 y_pred = []
@@ -130,11 +180,13 @@ for i in range(len(X_test)):
 print(confusion_matrix(y_test, y_pred))
 print(classification_report(y_test, y_pred))
 
-# Plot Loss and Accuracy
-plt.plot(range(num_epochs), loss_sums, label='Loss')
-plt.plot(range(num_epochs), accuracies, label='Accuracy')
+# plot the loss and accuracy saved in the visualizations folder
+plt.figure(figsize=(10, 5))
+plt.plot(loss_sums, label='Loss')
+plt.plot(accuracies, label='Accuracy')
 plt.xlabel('Epoch')
 plt.ylabel('Loss/Accuracy')
-plt.title('Training Progress')
+plt.title('Loss and Accuracy over Epochs')
 plt.legend()
-plt.show()
+plt.savefig(os.path.join(output_dir, f'loss_accuracy_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'))
+plt.close()
