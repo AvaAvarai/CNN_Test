@@ -85,12 +85,22 @@ for epoch in range(num_epochs):
             # Backward pass
             grad_kernel, grad_weights, grad_biases = cnn.backward(label)
 
-            # Update parameters using Adam optimizer
-            cnn.weights, cnn.biases = adam_optimizer.update(
-                cnn.weights, cnn.biases, grad_weights, grad_biases)
+            # Update all parameters using Adam optimizer
+            params = {
+                'kernel': cnn.kernel,
+                'weights': cnn.weights,
+                'biases': cnn.biases
+            }
+            grads = {
+                'kernel': grad_kernel,
+                'weights': grad_weights,
+                'biases': grad_biases
+            }
             
-            # Update kernel (you might want to add separate optimizer for kernel)
-            cnn.kernel -= 0.001 * grad_kernel  # Simple SGD for kernel
+            updated_params = adam_optimizer.update(params, grads)
+            cnn.kernel = updated_params['kernel']
+            cnn.weights = updated_params['weights']
+            cnn.biases = updated_params['biases']
 
     loss_sums.append(loss_sum / len(X_train))
     accuracies.append(correct / len(X_train))

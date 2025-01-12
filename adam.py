@@ -8,30 +8,32 @@ class AdamOptimizer:
         self.beta1 = beta1
         self.beta2 = beta2
         self.epsilon = epsilon
-        self.m_weights = 0
-        self.v_weights = 0
-        self.m_biases = 0
-        self.v_biases = 0
         self.t = 0
+        self.m = {}  # First moment dict
+        self.v = {}  # Second moment dict
 
-    def update(self, weights, biases, grad_weights, grad_biases):
+    def update(self, params, grads):
+        """
+        params: dictionary of parameters to update
+        grads: dictionary of gradients corresponding to parameters
+        """
+        if not self.m:  # Initialize momentum and velocity dictionaries
+            for key in params:
+                self.m[key] = np.zeros_like(params[key])
+                self.v[key] = np.zeros_like(params[key])
+
         self.t += 1
-        # Update biased first moments
-        self.m_weights = self.beta1 * self.m_weights + (1 - self.beta1) * grad_weights
-        self.m_biases = self.beta1 * self.m_biases + (1 - self.beta1) * grad_biases
+        
+        for key in params:
+            # Update biased first and second moments
+            self.m[key] = self.beta1 * self.m[key] + (1 - self.beta1) * grads[key]
+            self.v[key] = self.beta2 * self.v[key] + (1 - self.beta2) * (grads[key] ** 2)
 
-        # Update biased second moments
-        self.v_weights = self.beta2 * self.v_weights + (1 - self.beta2) * (grad_weights ** 2)
-        self.v_biases = self.beta2 * self.v_biases + (1 - self.beta2) * (grad_biases ** 2)
+            # Compute bias-corrected moments
+            m_corr = self.m[key] / (1 - self.beta1 ** self.t)
+            v_corr = self.v[key] / (1 - self.beta2 ** self.t)
 
-        # Compute bias-corrected moments
-        m_weights_corr = self.m_weights / (1 - self.beta1 ** self.t)
-        m_biases_corr = self.m_biases / (1 - self.beta1 ** self.t)
-        v_weights_corr = self.v_weights / (1 - self.beta2 ** self.t)
-        v_biases_corr = self.v_biases / (1 - self.beta2 ** self.t)
+            # Update parameters
+            params[key] -= self.lr * m_corr / (np.sqrt(v_corr) + self.epsilon)
 
-        # Update weights and biases
-        weights -= self.lr * m_weights_corr / (np.sqrt(v_weights_corr) + self.epsilon)
-        biases -= self.lr * m_biases_corr / (np.sqrt(v_biases_corr) + self.epsilon)
-
-        return weights, biases
+        return params
