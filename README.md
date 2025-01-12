@@ -1,6 +1,6 @@
 # Custom_MNIST_CNN
 
-Custom Convolutional Neural Network (CNN) for experimentation with on the MNIST dataset for open character recognition. Experimenting with architecture and visualization of the model's kernel and weights. Current architecture is a single convolutional layer followed by Leaky ReLU activation, max pooling, and a fully connected layer with softmax output, trained using an Adam optimizer with He initialization.
+Custom Convolutional Neural Network (CNN) for experimentation with on the MNIST dataset for open character recognition. Experimenting with architecture and visualization of the model's kernel and weights. Current architecture is one convolutional layer (3x3 kernel), followed by a leaky ReLU activation, max pooling (2x2), and a fully connected layer with softmax that outputs 10 classes for MNIST digit classification
 
 Best results so far with an 80:20 train:test split over 10 epochs is 92% accuracy.
 
